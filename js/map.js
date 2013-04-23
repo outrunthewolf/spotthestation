@@ -1,5 +1,3 @@
-// Default vars
-
 var tracker = {
 	
 	api_endpoint: "api/location.php",
@@ -7,6 +5,9 @@ var tracker = {
 	api_response: true,
 	
 	iss_route: [],
+	iss_velocity: {lon: 0, lat: 0},
+	iss_distance: 0, // Distance (Kilometers) between API calls
+	iss_last_call_time: 0,
 
 	map_container: false,
 	map: false,
@@ -66,6 +67,28 @@ var tracker = {
 				
 				// get new coords
 				var coords = new google.maps.LatLng(data.iss_position.latitude, data.iss_position.longitude);
+				
+				// Store the current time
+				var current_time = new Date().getTime();
+
+				if(tracker.iss_route.length > 0)
+				{
+					var previous_coords = tracker.iss_route[tracker.iss_route.length-1];
+					tracker.iss_velocity.lon = data.iss_position.longitude - previous_coords.lng();
+					tracker.iss_velocity.lat = data.iss_position.latitude - previous_coords.lat();
+					
+					// Calculate the distance the iss has travelled.
+					tracker.iss_distance = google.maps.geometry.spherical.computeDistanceBetween(previous_coords,coords) / 1000;
+					
+					if(tracker.iss_last_call_time > 0)
+					{
+						var time_since = current_time - tracker.iss_last_call_time;
+						var speed = tracker.iss_distance * (time_since / 1000);
+						console.log(speed + " Km/h");
+					}
+				}
+				
+				tracker.iss_last_call_time = current_time;
 
 				// push new coords to iss route array for tracking line
 				tracker.iss_route.push(coords);
