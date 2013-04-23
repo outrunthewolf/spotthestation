@@ -10,6 +10,9 @@ var tracker = {
 		tracker.resize();
 		tracker.mapInit();
 		tracker.loadMarker();
+		
+		// Switch to running interface
+		$("body").removeClass("start").addClass("running");
 	},
 
 	mapInit: function()
