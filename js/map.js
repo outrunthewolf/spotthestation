@@ -83,7 +83,7 @@ var tracker = {
 					if(tracker.iss_last_call_time > 0)
 					{
 						var time_since = current_time - tracker.iss_last_call_time;
-						var speed = tracker.iss_distance * (time_since / 1000);
+						var speed = tracker.iss_distance / ((time_since / 1000) / 60 / 60);
 						console.log(speed + " Km/h");
 					}
 				}
