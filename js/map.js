@@ -8,6 +8,7 @@ var tracker = {
 	iss_velocity: {lon: 0, lat: 0},
 	iss_distance: 0, // Distance (Kilometers) between API calls
 	iss_last_call_time: 0,
+	iss_previous_coords: false,
 
 	map_container: false,
 	map: false,
@@ -27,12 +28,19 @@ var tracker = {
 		// Switch to running interface
 		$("body").removeClass("start").addClass("running");
 
-		// Set time interval for updates
-		setInterval(function() {
+		// load all tracking data in
+		tracker.loadMarker();
+
+		// Estimate position
+		setInterval(function() 
+		{
 			if(tracker.api_response)
-				tracker.loadMarker();
+				tracker.estimatePosition();
 
 		},  tracker.api_interval);
+		
+
+		//tracker.loadMarker();
 
 		// Bind window resize
 		$(window).resize(function() {
@@ -71,49 +79,55 @@ var tracker = {
 				// Store the current time
 				var current_time = new Date().getTime();
 
-				if(tracker.iss_route.length > 0)
+				tracker.iss_previous_coords = tracker.iss_route[tracker.iss_route.length-1];
+
+				console.log(tracker.iss_previous_coords);
+
+				tracker.iss_velocity.lon = data.iss_position.longitude - tracker.iss_previous_coords.lng();
+				tracker.iss_velocity.lat = data.iss_position.latitude - tracker.iss_previous_coords.lat();
+				
+				// Calculate the distance the iss has travelled.
+				tracker.iss_distance = google.maps.geometry.spherical.computeDistanceBetween(previous_coords,coords) / 1000;
+
+				if(tracker.iss_last_call_time > 0)
 				{
-					var previous_coords = tracker.iss_route[tracker.iss_route.length-1];
-					tracker.iss_velocity.lon = data.iss_position.longitude - previous_coords.lng();
-					tracker.iss_velocity.lat = data.iss_position.latitude - previous_coords.lat();
-					
-					// Calculate the distance the iss has travelled.
-					tracker.iss_distance = google.maps.geometry.spherical.computeDistanceBetween(previous_coords,coords) / 1000;
-					
-					if(tracker.iss_last_call_time > 0)
-					{
-						var time_since = current_time - tracker.iss_last_call_time;
-						var speed = tracker.iss_distance / ((time_since / 1000) / 60 / 60);
-						console.log(speed + " Km/h");
-					}
+					var time_since = current_time - tracker.iss_last_call_time;
+					var speed = tracker.iss_distance / ((time_since / 1000) / 60 / 60);
+					console.log(speed + " Km/h");
 				}
 				
+
 				tracker.iss_last_call_time = current_time;
 
-				// push new coords to iss route array for tracking line
-				tracker.iss_route.push(coords);
-				tracker.drawRoute();
-
-				if(!tracker.map_marker) 
-				{
-					tracker.map_marker =  new google.maps.Marker({
-						position: coords,
-						map: tracker.map,
-						title: "ISS",
-						icon: "http://www.n2yo.com/inc/saticon.php?t=0&s=25544&c="
-					});
-					tracker.map.panTo(coords);
-				}
-				else
-				{
-					tracker.map_marker.setPosition(coords);
-				}
+				tracker.updateMarker(coords);
 			},                                                                                                                                                                                       
 			error: function(data) 
 			{
 				
 			}                                                                                                                                     
 		});
+	},
+
+	updateMarker: function(coords)
+	{
+		// update tracker map marker
+		if(!tracker.map_marker) 
+		{
+			tracker.map_marker =  new google.maps.Marker({
+				position: coords,
+				map: tracker.map,
+				title: "ISS",
+				icon: "http://www.n2yo.com/inc/saticon.php?t=0&s=25544&c="
+			});
+			tracker.map.panTo(coords);
+		}
+		else
+		{
+			tracker.map_marker.setPosition(coords);
+		}
+
+		// Draw the route based on only 2 coords
+		tracker.drawRoute(coords);
 	},
 	
 	// resize window
@@ -137,9 +151,7 @@ var tracker = {
 			tracker.user_lon = position.coords.longitude;
 
 			var coords = new google.maps.LatLng(tracker.user_lat, tracker.user_lon);
-			console.log(tracker.map);
 
-			
 			tracker.user_marker =  new google.maps.Marker({
 				position: coords,
 				map: tracker.map,
@@ -150,8 +162,13 @@ var tracker = {
 	},
 
 	// Draw a route line
-	drawRoute: function()
+	drawRoute: function(coords)
 	{
+		if(tracker.iss_route.length > 1)
+			tracker.iss_route.shift();
+
+		tracker.iss_route.push(coords); 
+
 		var path = new google.maps.Polyline({
 			path: tracker.iss_route,
 			strokeColor: "#FF0000",
@@ -160,6 +177,21 @@ var tracker = {
 		});
 
 		path.setMap(tracker.map);
+	},
+	
+	// estimate ISS position based on mean velocity
+	estimatePosition: function()
+	{						
+		var coords = new google.maps.LatLng
+		(
+			tracker.iss_previous_coords.lat() + tracker.iss_velocity.lat, 
+			tracker.iss_previous_coords.lng() + tracker.iss_velocity.lon
+		);
+
+		// update the map marker and route
+		tracker.updateMarker(coords);
+
+		console.log('shift pos est');
 	}
 }
 
